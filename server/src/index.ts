@@ -10,14 +10,10 @@ const server = net.createServer((conn: net.Socket) => {
     const [id, data] = JSON.parse(msg);
     console.log(data);
 
-    const confPath = findConfPath(path.dirname(data.path))
-    let options = {}
-    if (confPath != null) {
-      options = require(confPath)
-    }
-
-    const result = prettier.format(data.source, { ...options, parser: 'typescript' });
-    conn.write(JSON.stringify([id, { source: result }]));
+    resolveConfig(data.path).then(options => {
+      const result = prettier.format(data.source, { ...options, parser: 'typescript' });
+      conn.write(JSON.stringify([id, { source: result }]));
+    });
   });
 
   conn.on('close', () => {
@@ -27,16 +23,9 @@ const server = net.createServer((conn: net.Socket) => {
 
 server.listen(4242);
 
-// TODO: Use Prettier API to resolve configuration.
-const findConfPath = (dir: string): string | null => {
-  const confPath = path.join(dir, '.prettierrc')
-  if (fs.existsSync(confPath)) {
-    return confPath
+const resolveConfig = async (filePath: string | undefined): Promise<object> => {
+  if (filePath) {
+    return prettier.resolveConfig(filePath).then(options => options || {});
   }
-  const parentDir = path.dirname(dir) 
-  if (parentDir == dir) {
-    return null
-  } else {
-    return findConfPath(parentDir)
-  }
+  return {};
 };
