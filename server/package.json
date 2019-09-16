@@ -1,7 +1,7 @@
 {
-  "name": "server",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "vim-prets",
+  "version": "0.0.0",
+  "main": "dist/lib",
   "license": "MIT",
   "scripts": {
     "tsc": "npx tsc -w",
