@@ -1,0 +1,19 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "tsc": "npx tsc -w",
+    "serve": "npx nodemon node dist/lib/index.js"
+  },
+  "devDependencies": {
+    "nodemon": "^1.19.2",
+    "typescript": "^3.6.3"
+  },
+  "dependencies": {
+    "@types/node": "^12.7.5",
+    "@types/prettier": "^1.18.2",
+    "prettier": "^1.18.2"
+  }
+}
