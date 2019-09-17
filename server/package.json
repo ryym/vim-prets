@@ -1,5 +1,5 @@
 {
-  "name": "vim-prets",
+  "name": "vim-prets-server",
   "version": "0.0.0",
   "main": "dist/lib",
   "license": "MIT",
