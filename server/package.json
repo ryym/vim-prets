@@ -4,7 +4,8 @@
   "main": "dist/lib",
   "license": "MIT",
   "scripts": {
-    "tsc": "npx tsc -w",
+    "build": "npx tsc",
+    "watch": "npx tsc -w",
     "serve": "npx nodemon node dist/lib/index.js"
   },
   "devDependencies": {
