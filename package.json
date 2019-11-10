@@ -1,0 +1,10 @@
+{
+  "name": "vim-prets",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "node server/dist/lib"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

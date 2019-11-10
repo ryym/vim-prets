@@ -1,43 +1,63 @@
 import net from 'net';
 import path from 'path';
+import { promisify } from 'util';
 import fs from 'fs';
 import prettier from 'prettier';
 
 let connCnt = 0;
 
-const server = net.createServer((conn: net.Socket) => {
-  console.log('new connection', conn.remoteAddress);
-  connCnt += 1;
+const appendFile = promisify(fs.appendFile);
 
-  conn.on('data', (msg: any) => {
-    const [id, data] = JSON.parse(msg);
-    console.log(data);
+// from server/dist/lib
+const pluginRoot = path.resolve(__dirname, '..', '..', '..');
+const logDir = `${pluginRoot}/log`;
 
-    if (data.cmd === 'KILL') {
-      conn.end();
-      return;
-    }
+const log = async (msg: any) => {
+  console.log(msg);
 
-    resolveConfig(data.path).then(options => {
-      const result = prettier.format(data.source, { ...options, parser: 'typescript' });
-      conn.write(JSON.stringify([id, { source: result }]));
-    });
+  // const now = new Date();
+  // const year = now.getFullYear();
+  // let month = String(now.getMonth() + 1);
+  // let date = String(now.getDate());
+  // if (month < '10') {
+  //   month = '0' + month;
+  // }
+  // if (date < '10') {
+  //   date = '0' + date;
+  // }
+
+  // const fileName = `${logDir}/${year}${month}${date}`;
+  // if (typeof msg !== 'string') {
+  //   msg = JSON.stringify(msg);
+  // }
+  // return appendFile(fileName, msg + '\n');
+};
+
+const main = () => {
+  const server = net.createServer(conn => {
+    handleConnection(server, conn);
   });
 
-  conn.on('close', () => {
-    console.log('close');
-    connCnt -= 1;
-    if (connCnt <= 0) {
-      server.close();
-    }
-  });
-});
+  const alive = path.join(pluginRoot, '.alive');
 
-server.listen(4242);
-console.log('server started');
-server.on('close', () => {
-  console.log('shutdown');
-});
+  fs.writeFileSync(alive, process.pid);
+
+  server.listen(4242);
+
+  log('server started');
+  server.on('close', async () => {
+    await log('shutdown');
+    fs.unlinkSync(alive);
+  });
+
+  process.on('SIGINT', async () => {
+    await log('shutdown by SIGINT');
+    if (fs.existsSync(alive)) {
+      fs.unlinkSync(alive);
+    }
+    process.exit();
+  });
+};
 
 const resolveConfig = async (filePath: string | undefined): Promise<object> => {
   if (filePath) {
@@ -45,3 +65,57 @@ const resolveConfig = async (filePath: string | undefined): Promise<object> => {
   }
   return {};
 };
+
+const handleConnection = (server: net.Server, conn: net.Socket): void => {
+  connCnt += 1;
+  log(`new connection. connCnt: ${connCnt}`);
+
+  conn.on('data', async (msg: any) => {
+    const [id, data] = JSON.parse(msg);
+    log(data);
+
+    if (data.cmd === 'KILL') {
+      conn.end();
+      return;
+    }
+
+    const [options, info] = await Promise.all([
+      resolveConfig(data.path),
+      prettier.getFileInfo(data.path),
+    ]);
+
+    if (info.inferredParser == null) {
+      log('could not infer parser');
+      conn.write(JSON.stringify([id, { formatted: false }]));
+      return;
+    }
+
+    const result = prettier.format(data.source, {
+      ...options,
+      endOfLine: 'lf',
+      parser: info.inferredParser as any,
+    });
+
+    conn.write(
+      JSON.stringify([
+        id,
+        {
+          bufnr: data.bufnr,
+          formatted: true,
+          source: result,
+        },
+      ])
+    );
+  });
+
+  conn.on('close', async () => {
+    connCnt -= 1;
+    log(`close. connCnt: ${connCnt}`);
+    if (connCnt <= 0) {
+      await log('no connection. close server');
+      server.close();
+    }
+  });
+};
+
+main();
