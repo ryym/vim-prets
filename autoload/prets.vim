@@ -8,7 +8,21 @@ function! prets#server_alive() abort
   return filereadable(s:pid_path)
 endfunction
 
+function! prets#enable_for(filetypes) abort
+  " When user opens Vim by specifing a file, enable Prets immediately
+  " (FileType event does not be fired in this case).
+  if &filetype != '' && index(a:filetypes, &filetype) >= 0
+    call prets#enable()
+  endif
+
+  let names = join(a:filetypes, ',')
+  execute 'autocmd FileType' names 'call prets#enable()'
+endfunction
+
 function! prets#enable() abort
+  if s:connected
+    return
+  endif
   if !prets#server_alive()
     call prets#start_server()
   endif
