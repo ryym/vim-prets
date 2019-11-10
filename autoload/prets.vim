@@ -53,21 +53,34 @@ function! prets#connect(n_tries) abort
   endif
 endfunction
 
-function! prets#format_sync() abort
+function! s:format_sync(lines) abort
   let filepath = expand('%:p')
-  let src = join(getline(1, '$'), "\n")
+  let src = join(a:lines, "\n")
 
   " Send a whole text and make the server return the formatted version.
   " This is much faster than change the target file externally by `prettier -w [filename]`.
-  let res = ch_evalexpr(s:ch, {
+  return ch_evalexpr(s:ch, {
     \   'bufnr': bufnr('%'),
     \   'source': src,
     \   'path':filepath,
     \ })
-  call prets#_on_response(s:ch, res)
 endfunction
 
-function prets#_on_response(_ch, res)
+function prets#format_sync() abort
+  if !s:connected
+    return
+  endif
+
+  let res = s:format_sync(getline(1, '$'))
+  if has_key(res, 'source')
+    call s:replace_buffer_content(res)
+  else
+    let msg = get(res, 'message', 'unexpected error occurred')
+    echoerr msg
+  endif
+endfunction
+
+function s:replace_buffer_content(res)
   let lines = split(a:res.source, "\n")
   let first_line_to_remove = len(lines) + 1
   let bufnr = a:res.bufnr
@@ -79,23 +92,20 @@ function prets#_on_response(_ch, res)
   noautocmd write
 endfunction
 
-
-function prets#format_on_save() abort
-  if !s:connected
-    return
-  endif
-  call prets#format_sync()
-endfunction
-
 " Formatter function for ALE.
 " https://github.com/dense-analysis/ale
 function prets#ale(bufnr, lines) abort
-  let filepath = expand('%:p')
-  let src = join(a:lines, "\n")
-  let res = ch_evalexpr(s:ch, {
-    \   'bufnr': a:bufnr,
-    \   'source': src,
-    \   'path':filepath,
-    \ })
-  return split(res.source, "\n")
+  if !s:connected
+    return
+  endif
+
+  let res = s:format_sync(a:lines)
+  if has_key(res, 'source')
+    return split(res.source, "\n")
+  endif
+
+  let msg = get(res, 'message', 'unexpected error occurred')
+  for m in split(msg, "\n")
+    echoerr m
+  endfor
 endfunction

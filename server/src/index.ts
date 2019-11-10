@@ -86,26 +86,21 @@ const handleConnection = (server: net.Server, conn: net.Socket): void => {
 
     if (info.inferredParser == null) {
       log('could not infer parser');
-      conn.write(JSON.stringify([id, { formatted: false }]));
+      conn.write(JSON.stringify([id, { message: 'could not infer parser' }]));
       return;
     }
 
-    const result = prettier.format(data.source, {
-      ...options,
-      endOfLine: 'lf',
-      parser: info.inferredParser as any,
-    });
-
-    conn.write(
-      JSON.stringify([
-        id,
-        {
-          bufnr: data.bufnr,
-          formatted: true,
-          source: result,
-        },
-      ])
-    );
+    try {
+      const result = prettier.format(data.source, {
+        ...options,
+        endOfLine: 'lf',
+        parser: info.inferredParser as any,
+      });
+      conn.write(JSON.stringify([id, { bufnr: data.bufnr, source: result }]));
+    } catch (err) {
+      const message = err.message || 'unexpected error occurred';
+      conn.write(JSON.stringify([id, { message }]));
+    }
   });
 
   conn.on('close', async () => {
