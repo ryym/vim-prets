@@ -55,8 +55,9 @@ function! prets#disconnect() abort
 endfunction
 
 function! prets#connect(n_tries) abort
-  if a:n_tries >= 3
+  if a:n_tries >= 5
     echoerr '[vim-prets] Could not connect to Prets server'
+    return
   endif
 
   let s:ch = ch_open('localhost:4242', {'mode': 'json'})
