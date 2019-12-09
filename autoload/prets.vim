@@ -26,7 +26,7 @@ function! prets#enable() abort
   if !prets#server_alive()
     call prets#start_server()
   endif
-  call timer_start(300, {_ -> prets#connect(0)})
+  call timer_start(300, {_ -> prets#connect_async(10)})
 endfunction
 
 function! prets#disable() abort
@@ -54,18 +54,40 @@ function! prets#disconnect() abort
   call ch_sendexpr(s:ch, {'cmd': 'KILL'})
 endfunction
 
-function! prets#connect(n_tries) abort
-  if a:n_tries >= 5
+function! prets#connect_async(n_tries) abort
+  if a:n_tries <= 0
     echoerr '[vim-prets] Could not connect to Prets server'
     return
   endif
-
-  let s:ch = ch_open('localhost:4242', {'mode': 'json'})
-  if ch_status(s:ch) == 'open'
+  if s:connect_to_server()
     let s:connected = 1
   else
-    call timer_start(300, {_ -> prets#connect(a:n_tries + 1)})
+    call timer_start(300, {_ -> prets#connect_async(a:n_tries - 1)})
   endif
+endfunction
+
+function! prets#connect_sync(max_tries) abort
+  let n_tries = 0
+  while 1
+    if s:connect_to_server()
+      let s:connected = 1
+      break
+    endif
+    let n_tries += 1
+    if n_tries >= a:max_tries
+      echoerr '[vim-prets] Could not connect to Prets server (tried ' . n_tries . ' times)'
+      return 0
+    endif
+
+    sleep 300m
+  endwhile
+
+  return 1
+endfunction
+
+function s:connect_to_server() abort
+  let s:ch = ch_open('localhost:4242', {'mode': 'json'})
+  return ch_status(s:ch) == 'open'
 endfunction
 
 function! s:format_sync(lines) abort
@@ -112,6 +134,12 @@ endfunction
 function prets#ale(bufnr, lines) abort
   if !s:connected
     return
+  endif
+
+  if !prets#server_alive()
+    echom 'Prets server has stoped unexpectedly. Reconnecting...'
+    call prets#start_server()
+    call prets#connect_sync(10)
   endif
 
   let res = s:format_sync(a:lines)
