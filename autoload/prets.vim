@@ -159,11 +159,17 @@ function prets#ale(bufnr, lines) abort
   endfor
 endfunction
 
-function! s:format_stateless(bufnr, lines) abort
+function! s:format_stateless(bufnr, lines, include_ignore) abort
   let src = join(a:lines, "\n")
   let filepath = expand('%:p')
 
-  let json = json_encode({ 'source': src, 'path': filepath, 'filetype': &filetype, 'bufnr': a:bufnr  })
+  let json = json_encode({
+    \ 'source': src,
+    \ 'path': filepath,
+    \ 'filetype': &filetype,
+    \ 'bufnr': a:bufnr,
+    \ 'include_ignore': a:include_ignore,
+    \ })
   let output = system('node ' . shellescape(s:plugin_root) . '/format.js ' . shellescape(json))
   let result = json_decode(output)
   if type(result) != 4
@@ -183,8 +189,8 @@ function! s:format_stateless(bufnr, lines) abort
 endfunction
 
 function prets#ale_stateless(bufnr, lines) abort
-  let result = s:format_stateless(a:bufnr, a:lines)
-  if type(result) != 4
+  let result = s:format_stateless(a:bufnr, a:lines, 0)
+  if type(result) != 4 || !has_key(result, 'source')
     return
   endif
   return split(result.source, "\n")
@@ -192,7 +198,7 @@ endfunction
 
 function prets#format_stateless() abort
   let lines = getline(1, '$')
-  let result = s:format_stateless(bufnr('%'), lines)
+  let result = s:format_stateless(bufnr('%'), lines, 1)
   if type(result) != 4
     return
   endif

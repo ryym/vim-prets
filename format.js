@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const fs = require('fs');
+const path = require('path');
 const prettier = require('prettier');
 
 const main = async (args) => {
@@ -12,10 +14,16 @@ const main = async (args) => {
     return respondError('invalid input JSON');
   }
 
+  const ignorePath = findIgnoreFile(input.path);
+
   const [options, info] = await Promise.all([
     resolveConfig(input.path),
-    prettier.getFileInfo(input.path),
+    prettier.getFileInfo(input.path, { ignorePath }),
   ]);
+
+  if (info.ignored && !input.include_ignore) {
+    return respond('Ok', { ignored: true });
+  }
 
   const parser = getParserForFileType(input.filetype) || info.inferredParser;
   if (parser == null) {
@@ -71,6 +79,21 @@ const getParserForFileType = (filetype) => {
     default:
       return null;
   }
+};
+
+const findIgnoreFile = (filePath, nTries = 0) => {
+  if (nTries >= 100) {
+    throw new Error('failed to find ignore path (cannot detect root directory)');
+  }
+  const dir = path.dirname(filePath);
+  if (dir === path.dirname(dir)) {
+    return null; // root
+  }
+  const candidatePath = path.join(dir, '.prettierignore');
+  if (fs.existsSync(candidatePath)) {
+    return candidatePath;
+  }
+  return findIgnoreFile(dir, nTries + 1);
 };
 
 const respondError = (message) => {
