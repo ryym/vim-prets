@@ -5,6 +5,8 @@
   "scripts": {
     "start": "node server/dist/lib"
   },
-  "dependencies": {},
+  "dependencies": {
+    "prettier": "^2.0.5"
+  },
   "devDependencies": {}
 }

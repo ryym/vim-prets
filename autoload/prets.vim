@@ -158,3 +158,43 @@ function prets#ale(bufnr, lines) abort
     echoerr m
   endfor
 endfunction
+
+function! s:format_stateless(bufnr, lines) abort
+  let src = join(a:lines, "\n")
+  let filepath = expand('%:p')
+
+  let json = json_encode({ 'source': src, 'path': filepath, 'filetype': &filetype, 'bufnr': a:bufnr  })
+  let output = system('node ' . shellescape(s:plugin_root) . '/format.js ' . shellescape(json))
+  let result = json_decode(output)
+  if type(result) != 4
+    echoerr 'failed to run formatting'
+    return
+  endif
+
+  if result.type != 'Ok'
+    let msg = get(result.payload, 'message', 'unexpected error occurred')
+    for m in split(msg, "\n")
+      echoerr m
+    endfor
+    return
+  endif
+
+  return result.payload
+endfunction
+
+function prets#ale_stateless(bufnr, lines) abort
+  let result = s:format_stateless(a:bufnr, a:lines)
+  if type(result) != 4
+    return
+  endif
+  return split(result.source, "\n")
+endfunction
+
+function prets#format_stateless() abort
+  let lines = getline(1, '$')
+  let result = s:format_stateless(bufnr('%'), lines)
+  if type(result) != 4
+    return
+  endif
+  call s:replace_buffer_content(result)
+endfunction
