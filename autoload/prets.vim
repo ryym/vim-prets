@@ -143,6 +143,12 @@ function prets#ale(bufnr, lines) abort
   endif
 
   let res = s:format_sync(a:lines)
+  if type(res) != 4
+    echoerr 'unexpected response from server'
+    echoerr res
+    return
+  endif
+
   if has_key(res, 'source')
     return split(res.source, "\n")
   endif
